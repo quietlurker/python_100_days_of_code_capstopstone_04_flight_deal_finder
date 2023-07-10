@@ -12,7 +12,7 @@ class NotificationManager:
         self.smtp_port = 587
         self.email_body = ""
 
-    def send_email(self, flight_details):
+    def send_email(self, flight_details, email):
         departure_time_epoch = flight_details["data"][0]["route"][0]["dTimeUTC"]
         departure_time = datetime.fromtimestamp(departure_time_epoch)
 
@@ -34,7 +34,7 @@ class NotificationManager:
             msg['Subject'] = f"Cheap flight from {flight_details['data'][0]['route'][0]['cityFrom']} " \
                              f"to {flight_details['data'][0]['route'][0]['cityTo']}."
             msg['From'] = self.email_address
-            msg['To'] = self.email_address
+            msg['To'] = email
             msg.set_content(self.email_body)
             #
             connection.send_message(msg)

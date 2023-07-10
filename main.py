@@ -3,25 +3,22 @@ from flight_search import FlightSearch
 from notification_manager import NotificationManager
 from datetime import datetime, timedelta
 
+# INIT
 START_FROM = "WAW"
-
-# This file will need to use the DataManager,FlightSearch, FlightData, NotificationManager classes
-# to achieve the program requirements.
-
-# Use the Flight Search and Sheety API to populate your own copy of the Google Sheet
-# with International Air Transport Association (IATA) codes for each city.
-# Most of the cities in the sheet include multiple airports, you want the city code (not the airport code see here).
+today = datetime.now()
+tomorrow = today + timedelta(days=1)
+in_six_months = today + timedelta(days=30 * 6)
 flight_search = FlightSearch()
+data_manager = DataManager()
 
-destination_data = DataManager()
-
-destination_list = destination_data.get_destination_data()
+# get list of destinations and lowest prices from google sheet
+destination_list = data_manager.get_destination_data()
 
 # update iata codes
-for entry in range(len(destination_list)):
-    if destination_list[entry]["iataCode"] == "":
-        iata_code = flight_search.get_iata_code(destination_list[entry]["city"])
-        destination_data.update_iata(entry, iata_code, destination_list[entry]["id"])
+for count, entry in enumerate(destination_list, start=0):
+    if entry["iataCode"] == "":
+        iata_code = flight_search.get_iata_code(entry["city"])
+        data_manager.update_iata(count, iata_code, entry["id"])
 
 # print(destination_list)
 # this is to stop sheety searches as we have limited requests per month and I already used 79
@@ -38,9 +35,27 @@ for entry in range(len(destination_list)):
 #                     {'city': 'Kopenhagen', 'iataCode': 'CPH', 'lowestPrice': 50, 'id': 12},
 #                     {'city': 'Singapore', 'iataCode': 'SIN', 'lowestPrice': 100, 'id': 13}]
 
-today = datetime.now()
-tomorrow = today + timedelta(days=1)
-in_six_months = today + timedelta(days=30 * 6)
+# get the list of signed-up users from google sheets
+registered_users = data_manager.get_users()
+
+# ask for user input data
+user_name = input("State your name: ")
+
+user_email = ""
+user_email2 = "empty"
+while user_email != user_email2:
+    user_email = input("What is your email address: ")
+    user_email2 = input("Repeat email address: ")
+
+# check if user is in the user_list
+user_exist = False
+for email in registered_users:
+    if email["email"] == user_email:
+        user_exist = True
+
+# if user is not in user list - add it
+if not user_exist:
+    data_manager.update_user_list(user_name, user_email)
 
 # search for flight for all cities in destination_list
 for city in destination_list:
@@ -48,14 +63,15 @@ for city in destination_list:
     # get return flights from start city to destination from google sheet list
     search_data = flight_search.search_for_flight(city["iataCode"], today.strftime("%d/%m/%Y"),
                                                   in_six_months.strftime("%d/%m/%Y"), START_FROM)
-
     # print results if flight were found nad price is cheaper than in google sheet
     if search_data["_results"] != 0 and search_data["data"][0]["price"] <= city["lowestPrice"]:
         print(
             f"Cheap flight from {search_data['data'][0]['route'][0]['cityFrom']} "
-            f"to {search_data['data'][0]['route'][0]['cityTo']} found.\nSending email...")
+            f"to {search_data['data'][0]['route'][0]['cityTo']} found.\nSending emails...")
 
         notifications = NotificationManager()
-        notifications.send_email(search_data)
+        # do this for all users in user list
+        for user in registered_users:
+            notifications.send_email(search_data, user["email"])
     else:
         print(f"No cheap flights found from {START_FROM} to {city['city']} ")
